@@ -1,0 +1,200 @@
+---
+title: "PLPCC02 - Lab 1 - Checkpoint 2"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+## Tiago Lucas Pereira Clementino
+
+```{r setup}
+library(tidyverse)
+library(here)
+library(knitr)
+theme_set(theme_bw())
+options(warn=-1)
+```
+
+# Dados
+
+Os dados foram coletados a partir da operação da plataforma aberta de integração contínua Travistorent. Estes descrevem operações inerentes ao andamento de projetos no Github e a procedimentos de Integração Contínua (testes, *commits*, PR, *build* de integração, etc) ao longo de um certo período de tempo.
+
+A integração contínua é um processo onde o desenvolvedor integra o código alterado e/ou desenvolvido ao projeto principal na mesma frequência com que as funcionalidades são introduzidas.
+
+Nossa intenção é analisar os dados fazendo um paralelo entre as linguagens de programação Java e Ruby, levantando questões inerentes às características dos projetos de software que as utilizam. Diante disto, descartamos qualquer dados referentes a outras linguagens.
+
+```{r read}
+projetos = read_csv(here::here("data/projetos.csv"))
+```
+```{r clean}
+projetos = projetos %>% 
+    filter(lang != "javascript")
+```
+
+## Variáveis
+
+Nossa base de dados conta com variáveis bem intuitivas.
+
+```{r}
+projetos %>% names()
+```
+
+Cada uma delas descreve alguma característica dos projetos. 
+
+Nome                    | Descrição
+------------------------|---------------------------------------------------------------------------------
+"gh_project_name"       | nome do projeto 
+"team"                  | total de desenvolvedores que participaram do projeto até sua última medição
+"lang"                  | linguagem de programação predominante
+"sloc_end"              | total de linhas de código na última medição do projeto
+"sloc_med"              | total de linhas de código no meio do tempo de atividade estimado do projeto
+"activity_period"       | tempo de atividade estimado do projeto
+"num_commits"           | total de submissões de alteração durante todo o tempo de atividade do projeto
+"commits_per_month"     | total de submissões por mês
+"tests_per_kloc"        | casos de teste por total de linhas de código
+"total_builds"          | total de integrações
+"build_success_prop"    | proporção de integrações bem-sucedidas
+"builds_per_month"      | total médio de integrações por mês
+"tests_added_per_build" | total médio de testes adicionados por integração
+"tests_successful"      | total de testes bem-sucedidos
+"test_density"          | densidade de testes
+"test_size_avg"         | tamanho médio dos casos de testes
+
+Na nossa análise usaremos apenas as variáveis "team", "lang" e "build_success_prop".
+
+## Distribuições dos dados  
+
+Distribuição dos dados entre as linguagens de programação Java e Ruby.
+
+```{r}
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(projetos_ = n()) %>% 
+    ggplot(aes(x = lang, y = projetos_, fill = lang, color= lang)) + 
+    geom_col()
+```
+
+# Análise
+
+A partir daqui analisaremos nossos dados com base em duas questões importantes, a primeira é como o tamanho da equipe se comporta na nossa base de dados em relação as linguagens de programação Java e Ruby, e a segunda é como projetos grandes (10 integrantes ou mais) variam na proporção de integrações bem-sucedidas em função das mesmas duas linguagens. Nosso objetivo aqui é identificar características e peculiaridades dos dados basicamente em função da linguagem de programação, do tamanho da equipe de desenvolvimento e da proporção de integração de alterações.
+
+## Distribuição do tamanho de equipes para Java e Ruby
+
+Aqui pretendemos fazer uma análise da variável "tamanho da equipe" presente nos dados, deixando o alvo desta análise em aberto.
+
+```{r}
+projetos %>% 
+    ggplot(aes(x= team, color = lang)) + 
+    scale_x_log10() + 
+    geom_density()
+projetos %>% 
+    ggplot(aes(y = team, 
+               x = lang, color= lang)) + 
+    geom_violin() + 
+    scale_y_log10() + 
+    geom_jitter(width = .1, alpha = .1)
+projetos %>% 
+    ggplot(aes(x = lang, 
+               y = team, color=lang)) + 
+    geom_point(alpha = .3) + 
+    scale_y_log10()+ 
+    geom_boxplot(width = .25)
+
+
+```
+
+Com base nos gráficos acima podemos ver que há uma predominância de equipes entre dois e dez integrantes, sobretudo com 4 ou 5 pessoas. Ruby parece estar mais distribuída em uma faixa de valores um pouco mais densa, um valor máximo maior de 200, o que destoa do conjunto.
+
+```{r}
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(mediana = median(team)) %>% 
+    ggplot(aes(x = lang, y = mediana, fill = lang, color= lang)) + 
+    geom_col()
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(media = mean(team)) %>% 
+    ggplot(aes(x = lang, y = media, fill = lang, color= lang)) + 
+    geom_col()
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(desvio_padrao = sd(team)) %>% 
+    ggplot(aes(x = lang, y = desvio_padrao, fill = lang, color= lang)) + 
+    geom_col()
+```
+
+Dos gráficos apresentados acima, os dois resultados mais relevantes são: O total de desenvolvedores mais central nos dados é 5 tanto em Java quanto em Ruby (como os gráficos anteriores mostraram), o que sugere um equilíbrio. O segundo resultado importante é a diferença entre as taxas de variação de Java (aproximadamente 7) e Ruby (aproximadamente 11), sendo Java bem menor. Isto indica uma maior homogeneidade nos dados de Java.
+
+
+## Variação na proporção de integrações bem sucedidas para projetos com grandes equipes em função da linguagem
+
+Eliminar os projetos com menos de 10 membros na equipe equivale a descartar a maior parte da base de dados, o que altera bastante a distribuição dos dados. Como veremos em seguida, algumas medidas centrais dos dados foram reposicionadas.
+
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = lang, 
+               y = team,color=lang)) + 
+    geom_jitter(alpha = .4, width = .2, size = .8) + 
+    scale_y_log10()+ 
+    geom_boxplot(width = .25)
+projetos %>% 
+    filter(team>=10) %>%
+    ggplot(aes(x = lang, 
+               y = team,color=lang)) + 
+    geom_jitter(alpha = .4, width = .2, size = .8) + 
+    scale_y_log10()+ 
+    geom_boxplot(width = .25)
+```
+
+Os dois gráficos acima apresentam a disposição das quantidades de integrantes para cada equipe de todos os dados e do conjunto filtrado para valores superiores a 10. Perceba que houve uma grande distorção. 
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = lang, 
+               y = build_success_prop,color=lang)) + 
+    geom_violin() + 
+    geom_jitter(alpha = .4, width = .2, size = .8) + 
+    scale_y_log10()
+projetos %>% 
+    filter(team>=10) %>%
+    ggplot(aes(x = lang, 
+               y = build_success_prop,color=lang)) + 
+    geom_violin() +
+    geom_jitter(alpha = .4, width = .2, size = .8) + 
+    scale_y_log10()
+```
+
+O mesmo ocorre quando observamos a proporção de integrações bem-sucedidas. Perceba que o segundo gráfico, referente à amostra filtrada (equipe >= 10), é muito mais disperso.
+
+```{r}
+projetos %>% 
+    filter(team>=10) %>%
+    group_by(lang) %>% 
+    summarise(media = mean(build_success_prop)) %>% 
+    ggplot(aes(x = lang, y = media, fill = lang, color = lang)) + 
+    geom_col()
+projetos %>% 
+    filter(team>=10) %>%
+    group_by(lang) %>% 
+    summarise(mediana = median(build_success_prop)) %>% 
+    ggplot(aes(x = lang, y = mediana, fill = lang, color = lang)) + 
+    geom_col()
+projetos %>% 
+    filter(team>=10) %>%
+    group_by(lang) %>% 
+    summarise(desvio_padrao = sd(build_success_prop)) %>% 
+    ggplot(aes(x = lang, y = desvio_padrao, fill = lang, color = lang)) + 
+    geom_col()
+```
+
+Aqui finalmente comparamos a variação da proporção de integrações bem-sucedidas nos dados filtrados (equipe >= 10). Para isto tomamos três valores, cada um exposto em um gráfico acima: O valor médio, representando a proporção de integrações bem-sucedidas de cada projeto dividida pelo total de projetos para cada linguagem, o valor central (mediana), representando o projeto que divide os dados ordenados ao meio, e a taxa de variação desta variável.
+
+O valor médio desta variável para o conjunto filtrada mostra-se extremamente equilibrado, como é possível ver no gráfica, tendo as duas linguagens praticamente o mesmo resultado (algo em torno de 0.75).
+O valor central, que representa o projeto que divide os dados igualmente entre maiores e menores, apresenta uma certa vantagem para linguagem Java.
+
+Finalmente, a taxa de variação da proporção de integrações bem-sucedidas descrita no terceiro gráfico também apresenta vantagem para Java.
+
+Tento o valor médio bastante equilibrado entre as linguagens e uma vantagem para Java no valor central, já poderíamos ter concluído que a taxa de variação entre os projetos Java para esta variável é superior. O gráfico que descreve esta variação só confirma o que já parecia claro, projetos Java variam bem mais no que diz respeito a proporção de integrações bem-sucedidas.
+

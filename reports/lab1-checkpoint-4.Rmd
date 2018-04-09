@@ -1,0 +1,176 @@
+---
+title: "LPCC02 - Lab 1 - Checkpoint 2"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+**Tiago Lucas Pereira Clementino**
+
+**6 de abril de 2018**
+
+### Bibliotecas utilizadas
+
+```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(here)
+library(knitr)
+theme_set(theme_bw())
+options(warn=-1)
+```
+
+# Contexto
+
+Nosso objetivo é analisar e extrair informação de dados coletados por uma plataforma aberta de integração contínua chamada Travistorrent. O Travisttorrent é um serviço de integração contínua de projetos disponíveis no Github, um repositório de projetos colaborativos também aberto.
+
+A integração contínua é um processo onde o desenvolvedor integra o código alterado e/ou criado ao projeto principal na mesma frequência com que as funcionalidades são introduzidas.
+
+Nossa intenção é analisar os dados fazendo um paralelo entre as linguagens de programação Java e Ruby, levantando questões inerentes às características dos projetos de software que as utilizam. Diante disto, descartamos quaisquer dados referentes a outras linguagens.
+
+# Nossos Dados
+
+Os dados são informações diversas referentes à projetos disponíveis no Github e que, no momento da coleta, utilizaram o Travistorent nos ultimos três meses e corresponderam a certas especificações de filtragem. Estas informações descrevem operações inerentes ao andamento de projetos no Github e a procedimentos de integração contínua (testes, *commits*, PR, *builds* de integração, etc) ao longo de um certo período de tempo.
+
+### Carregando os dados
+
+```{r read}
+projetos = read_csv(here::here("data/projetos.csv"))
+```
+
+### Filtrando os dados (eliminando linguagens diferentes de Java e Ruby identificadas)
+
+```{r clean}
+projetos = projetos %>% 
+    filter(lang != "javascript")
+```
+
+# Variáveis
+
+Nossa base de dados conta com variáveis bem intuitivas.
+
+```{r}
+projetos %>% names()
+```
+
+Cada uma delas descreve alguma característica dos projetos. 
+
+Nome                      | Descrição
+--------------------------|---------------------------------------------------------------------------------
+**gh_project_name**       | nome do projeto 
+**team**                  | total de desenvolvedores que participaram do projeto até sua última medição
+**lang**                  | linguagem de programação predominante
+**sloc_end**              | total de linhas de código na última medição do projeto
+**sloc_med**              | total de linhas de código no meio do tempo de atividade estimado do projeto
+**activity_period**       | tempo de atividade estimado do projeto
+**num_commits**           | total de submissões de alteração durante todo o tempo de atividade do projeto
+**commits_per_month**     | total de submissões por mês
+**tests_per_kloc**        | casos de teste por total de linhas de código
+**total_builds**          | total de integrações
+**build_success_prop**    | proporção de integrações bem-sucedidas
+**builds_per_month**      | total médio de integrações por mês
+**tests_added_per_build** | total médio de testes adicionados por integração
+**tests_successful**      | total de testes bem-sucedidos
+**test_density**          | densidade de testes
+**test_size_avg**         | tamanho médio dos casos de testes
+
+Na nossa análise usaremos apenas as variáveis **sloc_end**, **team**, **activity_period**, **build_success_prop**, **test_size_avg**, **tests_per_kloc** e **lang**.
+
+# Distribuições dos dados entre Java e Ruby 
+
+O gráfico abaixo apresenta a distribuição dos dados entre Java e Ruby. É fácil perceber que a vantagem numérica de Ruby em relação à Java é grande. Nossas análises farão um paralelo entre estas duas linguagens.
+
+```{r}
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(projetos_ = n()) %>% 
+    ggplot(aes(x = lang, y = projetos_)) + 
+    geom_col(fill = "darkcyan", color = "darkcyan")
+```
+
+# Análise
+
+A partir daqui analisaremos nossos dados com base em duas questões específicas. A primeira é qual linguagem produz mais código de acordo com nossa base de dados em relação as linguagens de programação Java e Ruby, e a segunda é se testes maiores implicam em menos testes. A partir destas duas perguntas e com base em seus resultados analisaremos mais duas. Se podemos afirmar que produzir mais código leva a linguagem a casos de testes maiores e se menos testes implicam em menos sucesso nos *builds*.
+
+Nosso objetivo aqui é identificar características e peculiaridades dos dados basicamente em função de linguagem de programação, de tamanho da equipe de desenvolvimento, de tempo de atividade, total de testes, total de código e da proporção de integração.
+
+### 1.[Pergunta 3] Qual linguagem produz mais código?
+
+Se esta pergunta for feita à um programador familiarizado com ambas as linguagens, provavelmente ele terá a sua resposta. Porém, a mesma pergunta sendo feita à um outro possivelmente será respondida de forma diferente.
+Para chegarmos a uma conclusão a partir dos dados devemos calcular a **produtividade** média dos nossos programadores. Esta variável é obtida a partir do total de linhas de código dividido pela equipe multiplicada pelo tempo de duração do projeto. 
+
+O objetivo é estimar quanto código cada programador pode produzir num dado tempo. Linguagens mais "prolixas" levam programadores à produzir mais código. Como este valor representa um valor médio, de tendência central, habilidades específicas ou grau de experiência não são avaliadas aqui.
+
+O gráfico abaixo descreve uma curva de distribuição acumulada e mostra programadores Java mais produtivos que programadores Ruby. Podemos tomar este resultado para afirmar que, com base nos dados, Ruby produz mais código que Java (a mais alta produtividade dos codificadores Java implica em uma linguagem mais sucinta).
+
+```{r message=FALSE, warning=FALSE}
+projetos %>% 
+    mutate(produtividade = sloc_end / (team * activity_period)) %>%
+    ggplot(aes(x= produtividade, color = lang)) + 
+    scale_x_log10() + 
+    geom_density()
+```
+
+Outra observação pode ser feita com base na média desta produtividade agrupando Java e Ruby separadamente e usando um gráfico de colunas. Assim reiteramos a conclusão de que programadores Java são mais produtivos, por isso Ruby produz mais código.
+
+```{r}
+projetos %>% 
+    mutate(produtividade = sloc_end / (team * activity_period)) %>%
+    group_by(lang) %>% 
+    summarise(produtividade_media = mean(produtividade)) %>% 
+    ggplot(aes(x = lang, y= produtividade_media)) + 
+    geom_col(fill = "darkcyan", color = "darkcyan")
+```
+
+É claro que correlação não implica em causalidade. Outros fatores ausentes nos dados podem ter influenciado o resultado. É possível argumentar, por exemplo, que programadores Java e Ruby podem ter, de modo geral, níveis de experiência diferentes e, portanto, produtividades diferentes. Um forte argumento contra esta ameaça é o grande volume de programadores no conjunto de dados (mais de 2.736 para Java e 6.473 para Ruby, como mostra o cálculo abaixo). Deste modo, a correlação apresentada ainda é uma forte evidência de que Ruby é mais "prolixa".
+
+```{r}
+projetos %>%
+    group_by(lang) %>% 
+    summarise(total_desenvolvedores_por_linguagem = sum(team))
+
+```
+
+### 1.1. Com base nos dados podemos afirmar que produzir mais código leva a linguagem a casos de testes maiores?
+
+Tomando os resultados obtidos com a variável **produtividade**, constatamos que Ruby produz mais código. A partir disto, se verificarmos que Ruby produz casos de testes maiores, teremos uma evidência (e não uma causa) de que produzir mais código pode levar a casos de teste maiores. Tomando uma média da variável **test_size_avg** para cada linguagem, descrita como o tamanho médio dos casos de testes para cada projeto, teremos esta resposta.
+
+```{r}
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(tamanho_medio_de_casos_de_testes = mean(test_size_avg)) %>% 
+    ggplot(aes(x = lang, y= tamanho_medio_de_casos_de_testes )) + 
+    geom_col(fill = "darkcyan", color = "darkcyan")
+```
+
+Com base nas respostas das questões acima, podemos crer, como já poderíamos supor, que linguagens que produzem mais código tendem a produzir mais casos de testes também.
+
+### 2.[Pergunta 6] Testes maiores implicam em menos testes?
+
+Observando o gráfico abaixo, que descreve o tamanho médio de linhas de código de um caso de teste (y) pelo total de casos de teste por mil linhas de código (x), uma resposta clara que podemos dar é: Casos de testes médios muito grandes (mais de 100 linhas) só ocorrem em projetos com poucos testes, além de alguns projetos com apenas um ou dois casos de teste de milhares de linhas de código. Além desta constatação e observando a forma e direção da distribuição dos dados, vemos que há uma tendência geral, sobretudo para Ruby, que relaciona inversamente estas duas variáveis. Note que, para facilitar a visualização, o gráfico abaixo está em escala logarítmica. A relação entre estas variáveis é bem mais íngreme em escala linear, porém de difícil visualização.
+
+```{r message=FALSE, warning=FALSE}
+projetos %>% 
+    ggplot(aes(x= tests_per_kloc, y= test_size_avg)) + 
+    scale_x_log10()+ 
+    scale_y_log10()+ 
+    geom_point(alpha = .3, color = "darkcyan") + 
+    stat_smooth(method = "loess")+
+    facet_grid(lang ~ .)
+
+```
+
+### 2.2. Menos testes implicam em menos sucesso nos *builds*?
+
+Levando a questão anterior em termos práticos, se o projeto implementa testes com frequência (geralmente pequenos ou médios) isto o leva a mais sucesso nos *builds*? No gráfico abaixo, onde comparamos  o total de casos de teste por mil linhas de código com a proporção de sucesso não conseguimos ver muita relação entre estas duas variáveis.
+
+A partir deste gráfico dá para concluir que, por mais que haja um acumulo de projeto com um certo volume de testes (esta tendência varia entre as linguagens), a variável "sucesso nos *builds*" (**build_success_prop**) não apresenta uma forma ou direção clara em sua distribuição.
+
+```{r message=FALSE, warning=FALSE}
+projetos %>% 
+    ggplot(aes(x= tests_per_kloc, y= build_success_prop , color = lang),na.rm=TRUE) + 
+    scale_x_log10()+ 
+    scale_y_log10()+ 
+    geom_point(alpha = .3) + 
+    stat_smooth(method='loess',na.rm=TRUE)
+```

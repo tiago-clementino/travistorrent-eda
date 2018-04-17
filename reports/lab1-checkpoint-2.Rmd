@@ -1,0 +1,461 @@
+---
+title: "PLPCC02 - Lab 1 - Checkpoint 2"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup}
+library(tidyverse)
+library(here)
+library(knitr)
+theme_set(theme_bw())
+```
+
+## Dados
+
+Os dados foram coletados a partir da operação da plataforma aberta de integração contínua Travistorent. Estes descrevem operações inerentes ao andamento do projeto e a procedimentos de Integração Contínua (testes, commits, PR, build de integração, etc) ao longo de um certo período de tempo.
+A integração contínua é um processo onde o desenvolvedor integra o código alterado e/ou desenvolvido ao projeto principal na mesma frequência com que as funcionalidades são desenvolvidas.
+Nossa intenssão é analisar os dados fazendo um paralelo entre as linguagens de programação Java e Ruby levantando questões inerentes às características dos projetos de software que às utilizam. Diante disto, descartamos qualquer dados referente à outras linguagens.
+
+```{r read}
+projetos = read_csv(here::here("data/projetos.csv"))
+```
+```{r clean}
+projetos = projetos %>% 
+    filter(lang != "javascript")
+```
+
+## Variáveis
+
+Nossa base de dados conta com variáveis bem intuitiva.
+
+```{r}
+projetos %>% names()
+```
+
+Cada uma delas descreve uma característica dos projeto. 
+
+"gh_project_name"        nome do projeto), 
+"team"                   total de desenvolvedores que participaram do projeto até sua ultima medição
+"lang"                   linguagem de programação poredominante
+"sloc_end"               total de linhas de código na ultima medição do projeto
+"sloc_med"               total de linhas de código no meio do tempo de atividade estimado do projeto
+"activity_period"        tempo de atividade estimado do projeto
+"num_commits"            total de submissões de alteração durante todo o tempo de atividade do projeto
+"commits_per_month"      total de submissões por mês
+"tests_per_kloc"         casos de teste por total de linhas de código
+"total_builds"           total de integrações
+"build_success_prop"     proporção de integrações bem sucedidas
+"builds_per_month"       total médio de integrações por mês
+"tests_added_per_build"  total médio de testes adicionados por integração
+"tests_successful"       total de testes bem sucedidos
+"test_density"           densidade de testes
+"test_size_avg"          tamanho médio dos casos de testes
+
+Na nossa análise usaremos apenas as variáveis "sloc_end", "sloc_med", "activity_period", "build_success_prop" e "test_density" tomadas em função de "team" e "lang".
+
+## Distribuições dos dados  
+
+Distribuição dos dados entre as linguagens de programação Java e Ruby.
+
+```{r}
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(n = n()) %>% 
+    ggplot(aes(x = lang, y = n)) + 
+    geom_col()
+projetos %>% 
+    filter(tests_per_kloc >=.1) %>%
+    ggplot(aes(x= tests_per_kloc, y= test_size_avg , color = lang)) + 
+    scale_x_log10()+ 
+    geom_point(alpha = .3) + 
+    stat_smooth(method = "lm")+
+    facet_grid(lang ~ .)
+
+projetos %>% 
+    filter(team >=20) %>%
+    ggplot(aes(x= tests_per_kloc , color = lang, add=T)) + 
+    scale_x_log10()+ 
+    geom_density()
+projetos %>% 
+    ggplot(aes(x= tests_per_kloc / team , color = lang)) + 
+    scale_x_log10()+ 
+    geom_density()
+projetos %>% 
+    ggplot(aes(x= team, color = lang)) + 
+    scale_x_log10()+ 
+    geom_density()
+```
+
+## análise
+
+A partir daqui analisaremos nosso dados com base em duas perguntas. Nosso objetivo aqui é identificar características e peculiaridade dos dados basicamente em função da linguagem de programação e do tamanho da equipe de desenvolvimento.
+
+## Pergunta A: Como são os tamanhos de time nos projetos que usam travis em Java e em Ruby nos nossos dados?
+
+A pergunta em questão pede uma análise da variável "tamanho da equipe" presente nos dados, deixando o alvo desta análise em aberto. Optei por realizar esta análise a partir da observação desta variável e compará-la com mais duas que chamei de produtividade e sucesso em integrações por integrante.
+
+```{r}
+projetos %>% 
+    filter(commits_per_month <= 10) %>%
+    ggplot(aes(x= team , color = lang)) + 
+    geom_density()
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(n = n()) %>% 
+    ggplot(aes(x = lang, y = n)) + 
+    geom_col()
+projetos %>% 
+    filter(commits_per_month < builds_per_month) %>%
+    group_by(lang) %>% 
+    summarise(n = n()) %>% 
+    ggplot(aes(x = lang, y = n)) + 
+    geom_col()
+projetos %>% 
+    filter(commits_per_month <= 100, commits_per_month >= builds_per_month) %>%
+    ggplot(aes(x= (commits_per_month - builds_per_month)*100/commits_per_month, color = lang)) + 
+    scale_x_log10()+ 
+    geom_density()
+projetos %>% 
+    filter(commits_per_month <= 100, commits_per_month >= builds_per_month) %>%
+    ggplot(aes(x= (commits_per_month - builds_per_month)*100/commits_per_month, y=team, color = lang)) + 
+    scale_y_log10()+ 
+    geom_point(alpha = .3) + 
+    stat_smooth(method = "lm")
+projetos %>% 
+    filter(commits_per_month <= 100, commits_per_month >= builds_per_month) %>%
+    ggplot(aes(x= (commits_per_month - builds_per_month)*100/commits_per_month, y=activity_period, color = lang)) + 
+    geom_point(alpha = .3) + 
+    stat_smooth(method = "lm")
+projetos %>% 
+    filter(commits_per_month <= 100, commits_per_month >= builds_per_month) %>%
+    ggplot(aes(x= (commits_per_month - builds_per_month)*100/commits_per_month, color = lang)) + 
+    scale_x_log10()+ 
+    geom_density()
+projetos %>% 
+    filter(commits_per_month <= 100, commits_per_month >= builds_per_month) %>%
+    ggplot(aes(x= commits_per_month , color = lang)) + 
+    geom_density()
+projetos %>% 
+    filter(builds_per_month <= 100, commits_per_month >= builds_per_month) %>%
+    ggplot(aes(x= builds_per_month, color = lang)) + 
+    geom_density()
+projetos %>% 
+    ggplot(aes(x= team, color = lang)) + 
+    geom_density()
+projetos %>% 
+    ggplot(aes(y = team, 
+               x = lang)) + 
+    geom_violin() + 
+    scale_y_log10() + 
+    geom_jitter(width = .1, alpha = .1)
+projetos %>% 
+    ggplot(aes(x = lang, 
+               y = team, color=lang)) + 
+    geom_point(alpha = .3) + 
+    scale_y_log10()+ 
+    stat_smooth(method = "lm")
+```
+```{r}
+projetos %>% 
+    filter(test_density>0) %>%
+    filter(team<50) %>%
+    ggplot(aes(x= team, y = test_density, color = lang)) +
+    scale_y_log10() + 
+    geom_violin() + 
+    geom_jitter(width = .1, alpha = .1) + 
+    facet_grid(lang ~ .)
+
+
+projetos %>% 
+    filter(team<50) %>%
+    group_by(lang,team) %>% 
+    summarise(n = mean(test_density)) %>% 
+    ggplot(aes(y = n, x = team, color = lang)) +
+    
+    geom_jitter(width = .1, alpha = 1.0) + 
+    facet_grid(lang ~ .)
+
+
+projetos %>% 
+    filter(test_density>0) %>%
+    filter(team<50) %>%
+    ggplot(aes(y= test_density, x=team, color = lang)) + 
+    geom_col() + 
+    facet_grid(lang ~ .)
+
+projetos %>% 
+    filter(test_density>0) %>%
+    filter(test_density<500) %>%
+    ggplot(aes(x= test_density)) + 
+    geom_histogram(bins = 100) + 
+    facet_grid(lang ~ .)
+
+projetos %>% 
+    filter(test_density>0) %>%
+    ggplot(aes(x = test_density, color = lang)) + 
+    scale_x_log10() + 
+    geom_density()
+```
+
+Com base nos gráficos acima podemos ver que há uma predominância de equipes entre dois e dez integrantes, sobretudo com 4 ou 5 pessoas.
+
+```{r}
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(n = median(team)) %>% 
+    ggplot(aes(x = lang, y = n)) + 
+    geom_col()
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(n = mean(team)) %>% 
+    ggplot(aes(x = lang, y = n)) + 
+    geom_col()
+projetos %>% 
+    group_by(lang) %>% 
+    summarise(n = sd(team)) %>% 
+    ggplot(aes(x = lang, y = n)) + 
+    geom_col()
+```
+Dos gráficos apresentados acima os dois resultado mais relevantes são: O total de desenvolvedores mais central nos dados é 5 tanto em Java quanto em Ruby (como os gráficos anteriors mostraram), o que sugere um equilíbrio. O segundo resultado importante é a diferença entre as taxas de variação de Java (aproximadamente 7) e Ruby (aproximadamente 11), sendo Java bem menor. Isto indica uma maior homogeneidade nos dados de Java.
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = activity_period, 
+               y = team, color=lang)) + 
+    geom_point(alpha = .3) + 
+    scale_y_log10()+ 
+    stat_smooth(method = "lm")
+projetos %>% 
+    ggplot(aes(x= activity_period, color = lang)) + 
+    geom_density()
+projetos %>% 
+    filter(lang=='java'||lang=='ruby') %>%
+    ggplot(aes(x = sloc_end, 
+               y = team, color=lang)) + 
+    geom_point(alpha = .3) + 
+    scale_x_log10() + 
+    scale_y_log10() + 
+    stat_smooth(method = "lm")
+projetos %>% 
+    filter(lang=='java'||lang=='ruby') %>%
+    ggplot(aes(x = sloc_med, 
+               y = team, color=lang)) + 
+    geom_point(alpha = .3) + 
+    scale_x_log10() + 
+    scale_y_log10() + 
+    stat_smooth(method = "lm")
+projetos %>% filter(sloc_end > 100 && sloc_end < 1000000) %>%
+    ggplot(aes(x= sloc_end, color = lang)) + 
+    scale_x_log10() + 
+    geom_density()
+projetos %>% 
+    filter(sloc_end > 100 && sloc_end < 1000000) %>%
+    mutate(productivity = sloc_end / (team * activity_period)) %>%
+    ggplot(aes(x= productivity, color = lang)) + 
+    scale_x_log10() + 
+    geom_density()
+
+```
+
+Produtividade aqui é o tamanho do código completo do projeto ponderado pelo tamanho do time multiplicado pelo período de atividade do projeto (código / [tamanho da equipe X período de atividade]). Com relação ao tamanho do código do projeto, optei por utilizar a variável referente à este valor na ultima médição ("sloc_end") por duas razões: entender que esta seria a mais adequada e por ambas terem um distribuição muito parecida ("sloc_end" e "sloc_med") como é possível observar nos terceiro e quarto gráficos acima.
+Há ainda uma peculiaridade com relação à distribuiçao da variável "período de atividade do projeto". Como é possível ver nos primeiro e segundo gráficos da série acima, a proporção de projetos Java é maior para projeto de menor duração, mas não altura dos 30 meses de vida, aproximadamente, esta proporção passar a peder para projetos Ruby.
+Observando, finalmente, a variável produtividade (último gráfico), veja que Java leva uma certa vantagem em relação a Ruby. Isto indica que equipes de desenvolvimento Java produzem mais código que equipes Ruby. Mesmo quando eliminamos os extremos (menos de 100 linhas de código e mais de um milhão) ainda sim a vantagem persiste. Isto pode ter dois significados, estas equipes podem de fato ser mais produtivas em termos de software ou estas equipes são mais produtivas porque a linguagem é mais prolixa e requer mais volume de texto para o mesmo software.
+
+```{r}
+projetos %>% 
+    ggplot(aes(x= test_density, color = lang)) + 
+    scale_x_log10() + 
+    geom_density()
+projetos %>% mutate(test_density_per_developer = test_density * team) %>%
+    ggplot(aes(x= test_density_per_developer, color = lang)) + 
+    scale_x_log10() + 
+    geom_density()
+```
+Ao comparar as duas linguagens com relação à densidade de testes, à despeito do maior volume de código dos projetos Java (é possível que justamente em função disto) os projetos Ruby parecem ter mais testes em função do total de código. O que implica em duas comclusões, ou os projetos Ruby realmente tem mais testes ou Java é uma linguagem mais prolixa e por isto gera mais código.
+Observando um paralelo entre o tamanho da equipe e a densidade de testes, a diferença praticamente se mantem. Isto leva a crer que programadores Ruby passam mais tempo escrevendo testes que programadores Java, mas não acrescenta muito em relação ao tamanho da equipe.
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = build_success_prop, 
+               y = test_density, color=lang)) + 
+    geom_point(alpha = .3) + 
+    scale_y_log10()+ 
+    stat_smooth(method = "lm")
+projetos %>% 
+    ggplot(aes(x= build_success_prop, color = lang)) + 
+    scale_x_log10() + 
+    geom_density()
+projetos %>% mutate(build_success_prop_per_team = team * build_success_prop) %>%
+    ggplot(aes(x= build_success_prop_per_team, color = lang)) + 
+    scale_x_log10() + 
+    geom_density()
+projetos %>% 
+    ggplot(aes(x= team, color = lang)) + 
+    scale_x_log10() + 
+    geom_density()
+```
+
+
+## Pergunta B: Ao comparar projetos em Java e em Ruby que tenham ao menos 10 contribuidores no time nos nossos dados, projetos de qual linguagem variam mais na proporção de builds cujo resultado é sucesso?
+
+.....
+
+
+```{r}
+projetos %>% 
+    filter(team>=10) %>%
+    filter(lang=='java'||lang=='ruby') %>%
+    ggplot(aes(x = 'um label', 
+               y = team,color=lang)) + 
+    geom_jitter(alpha = .4, width = .2, size = .8) 
+projetos %>% 
+    filter(team>=10) %>%
+    filter(lang=='java'||lang=='ruby') %>%
+    group_by(lang) %>% 
+    summarise(build_success_prop_var = sd(build_success_prop)) %>% 
+    ggplot(aes(x = lang, y = build_success_prop_var)) + 
+    geom_col()
+```
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = "um label", 
+               y = build_success_prop)) + 
+    geom_jitter(alpha = .4, width = .2, size = .8) 
+```
+
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = team)) + 
+    geom_histogram(binwidth = 10, fill = "white", color = "blue") + 
+    geom_rug(alpha = .5)
+
+projetos %>% 
+    ggplot(aes(x = build_success_prop)) + 
+    geom_histogram(binwidth = .1, fill = "white", color = "red") + 
+    geom_rug(alpha = .3)
+```
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = team)) + 
+    stat_ecdf()
+```
+
+```{r}
+projetos %>% 
+    ggplot(aes(x= lang, 
+               y = build_success_prop)) + 
+    geom_boxplot(width = .25)
+
+projetos %>% 
+    ggplot(aes(x= build_success_prop)) + 
+    geom_histogram(bins = 10) + 
+    facet_grid(lang ~ .)
+
+projetos %>% 
+    ggplot(aes(x= build_success_prop, color = lang)) + 
+    stat_ecdf() 
+
+```
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = build_success_prop, color = lang)) + 
+    geom_density()
+```
+
+```{r}
+projetos %>% 
+    ggplot(aes(y = build_success_prop, 
+               x = lang)) + 
+    geom_violin() + 
+    geom_jitter(width = .1, alpha = .1)
+```
+
+
+1 nominal x 1 numérica
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = lang, y = team)) + 
+    geom_jitter(alpha = .4, width = .2, size = .8) 
+```
+
+Transformação de log na escala da variável team:
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = lang, y = team)) + 
+    geom_jitter(alpha = .4, width = .2, size = .8) + 
+    scale_y_log10()
+```
+
+O que é a transformação de log
+
+```{r}
+escalas = tibble(x = 10**(1:20), 
+                 escala_linear = x, 
+                 escala_log = log10(x))
+
+escalas
+```
+
+
+### Histogramas e density plots
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = sloc_end)) + 
+    geom_histogram(bins = 20, fill = "white", color = "blue") + 
+    facet_grid(lang ~ .) +
+    scale_x_log10()
+```
+
+Density
+
+Rugs
+
+ECDFs
+
+Boxplots
+
+Violin
+
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = activity_period)) + 
+    geom_histogram(bins = 10, fill = "white", color = "blue") + 
+    geom_rug(alpha = .3) + 
+    facet_grid(lang ~ .) 
+```
+
+
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = sloc_end, color = lang)) + 
+    stat_ecdf() + 
+    scale_x_log10()
+```
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = build_success_prop)) + 
+    geom_density()
+```
+
+```{r}
+projetos %>% 
+    ggplot(aes(x = team, 
+               y = commits_per_month)) + 
+    geom_point(alpha = .3) + 
+    scale_x_log10() + 
+    scale_y_log10()
+```
+

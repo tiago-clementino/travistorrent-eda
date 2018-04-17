@@ -17,8 +17,10 @@ library(tidyverse)
 library(here)
 library(knitr)
 library(gridExtra)
-library(gganimate)
+#library(gganimate)
+library(ggExtra)
 library(gapminder)
+library(ggalt)
 theme_set(theme_bw())
 options(warn=-1)
 ```
@@ -99,7 +101,7 @@ Nosso objetivo aqui é identificar características e peculiaridades dos dados b
 
 # Variáveis de estudo.
 
-O objetivo de nossa investigação é entender os dados e as relações entre suas variáveis. Nesta direção, selecionamos para este relatório quatro variáveis que serão alvo de comparações, medições e visualizações, são elas: **lang**, **team**, **tests_per_kloc** e **build_success_prop**. Nosso objetivo não é responder a uma pergunta específica ou testar uma hipótese, mas apenas relacionar estas variáveis e observar seu comportamento.
+O objetivo de nossa investigação é entender os dados e as relações entre suas variáveis. Nesta direção, selecionamos para este relatório quatro variáveis que serão alvo de comparações, medições e visualizações, são elas: **sloc_end**, **sloc_med**, **tests_per_kloc** e **test_size_avg**, outras variáveis também podem ser usadas na comparação, como **lang** ou **team**. Nosso objetivo não é responder a uma pergunta específica ou testar uma hipótese, mas apenas relacionar estas variáveis e observar seu comportamento.
 
 ### lang
 
@@ -107,6 +109,17 @@ A variável **lang**, que marca a linguagem predominante em cada projéto, é ca
 
 
 ´´´
+
+
+
+
+
+Dumbbell Plot - entre sloc_med e sloc_end
+
+
+
+
+
 
 ibrary(ggplot2)
 library(gridExtra)
@@ -156,6 +169,7 @@ grid.arrange(arrangeGrob(p2,ncol=2,widths=c(3,1)),
 
 ```{r}
 set.seed(42)
+theme_set(theme_bw())  # pre-set the bw theme.
 DF <- data.frame(x=rnorm(100,mean=c(1,5)),y=rlnorm(100,meanlog=c(8,6)),group=1:2)
 
 p1 <- ggplot(DF,aes(x=x,y=y,colour=factor(group))) + geom_point() +
@@ -192,42 +206,168 @@ grid.arrange(arrangeGrob(p2,ncol=2,widths=c(3,1)),
 
 theme_set(theme_bw())  # pre-set the bw theme.
 projetos %>% 
-    ggplot(aes(x= tests_per_kloc, y= test_size_avg)) + 
-    geom_count(alpha = .3, color = "darkcyan", show.legend=F) +
-    labs(subtitle="mpg: city vs highway mileage", 
-       y="hwy", 
-       x="cty", 
-       title="Counts Plot")
-
-
-
-
-
-
-theme_set(theme_bw())  # pre-set the bw theme.
-g <- projetos %>%
-        ggplot(aes(x= tests_per_kloc, y= test_size_avg)) + 
+    ggplot(aes(x= tests_per_kloc, y= test_size_avg, size=team, color=lang),na.rm=TRUE) + 
     scale_x_log10()+ 
     scale_y_log10()+ 
-        labs(subtitle="mpg: Displacement vs City Mileage",
-        title="Bubble chart")
+    geom_count(alpha = .3) + 
+    
+    stat_smooth(method='lm',na.rm=TRUE)+
+    labs(subtitle="total de casos X tamanho dos casos", 
+       y="Tamanho médio dos casos de teste", 
+       x="Testes por K linhas de código", 
+       title="Tamanho dos testes",
+       size="tamanho da equipe")
 
-g + geom_jitter(aes(color= lang, size= team)) + 
-  geom_smooth(aes(col=lang), method="lm", se=F)
+
+
+
+
+
+#theme_set(theme_bw())  # pre-set the bw theme.
+#g <- projetos %>% 
+#        ggplot(aes(x= tests_per_kloc, y= test_size_avg, size = team, frame = lang)) +
+#        geom_point() +
+#        geom_smooth(aes(group = lang), 
+#              method = "lm", 
+#              show.legend = FALSE) +
+#        facet_wrap(~continent, scales = "free") +
+#        scale_x_log10()  # convert to log scale
+
+#gganimate(g, interval=0.2)
+
+
+
+
+
+
+
+# The mtcars dataset is proposed in R
+#head(mtcars)
+ 
+theme_set(theme_bw())  # pre-set the bw theme.
+
+# classic plot :
+projetos %>%
+    ggplot(aes(x= tests_per_kloc, y= test_size_avg, color=lang, size=team)) +
+      geom_point() +
+        scale_y_log10()+ 
+        scale_x_log10()+ 
+      #theme(legend.position="none")+
+    theme_gray(base_size = 14) 
+ 
+# with marginal histogram
+#ggMarginal(p, type="histogram")
+ 
+# marginal density
+#ggMarginal(p, type="density")
+ 
+# marginal boxplot
+ggMarginal(ppp, type="boxplot")
+
+
+
+gg <- projetos %>%
+    ggplot(aes(x=sloc_med, xend=sloc_end, y=team, group=team)) + 
+        geom_dumbbell(color="#a3c4dc", 
+                      size=1.0, 
+                      alpha=.4,
+                      colour_xend = "#0e668b") + 
+        #scale_x_continuous(label=percent) + 
+    
+        scale_y_log10()+ 
+        labs(x=NULL, 
+             y=NULL, 
+             title="Dumbbell Chart", 
+             subtitle="Pct Change: 2013 vs 2014", 
+             caption="Source: https://github.com/hrbrmstr/ggalt") +
+        theme(plot.title = element_text(hjust=0.5, face="bold"),
+              plot.background=element_rect(fill="#f7f7f7"),
+              panel.background=element_rect(fill="#f7f7f7"),
+              panel.grid.minor=element_blank(),
+              panel.grid.major.y=element_blank(),
+              panel.grid.major.x=element_line(),
+              axis.ticks=element_blank(),
+              legend.position="top",
+              panel.border=element_blank())
+plot(gg)
+
+```
+
+```{r}
+theme_set(theme_bw())  
+
+
+# Diverging Barcharts
+ggplot(mtcars, aes(x=`car name`, y=mpg_z, label=mpg_z)) + 
+  geom_bar(stat='identity', aes(fill=mpg_type), width=.5)  +
+  scale_fill_manual(name="Mileage", 
+                    labels = c("Above Average", "Below Average"), 
+                    values = c("above"="#00ba38", "below"="#f8766d")) + 
+  labs(subtitle="Normalised mileage from 'mtcars'", 
+       title= "Diverging Bars") + 
+  coord_flip()
+
+
+theme_set(theme_bw())  
+
+
+
+# Diverging Barcharts
+ggplot(mtcars, aes(x=`car name`, y=mpg_z, label=mpg_z)) + 
+  geom_bar(stat='identity', aes(fill=mpg_type), width=.5)  +
+  scale_fill_manual(name="Mileage", 
+                    labels = c("Above Average", "Below Average"), 
+                    values = c("above"="#00ba38", "below"="#f8766d")) + 
+  labs(subtitle="Normalised mileage from 'mtcars'", 
+       title= "Diverging Bars") + 
+  coord_flip()
 
 
 
 theme_set(theme_bw())  # pre-set the bw theme.
-g <- projetos %>% 
-        ggplot(gapminder, aes(gdpPercap, lifeExp, size = team, frame = lang)) +
-        geom_point() +
-        geom_smooth(aes(group = lang), 
-              method = "lm", 
-              show.legend = FALSE) +
-        facet_wrap(~continent, scales = "free") +
-        scale_x_log10()  # convert to log scale
+projetos %>% 
+    filter(team <= 10) %>%
+    group_by(team) %>%
+    summarise(mean_team =mean(team), sd_team=sd(team)) %>% 
+    mutate(team2=as.character(team),team_total = round((team - mean_team)/sd_team, 2)) %>%
+    ggplot(aes(x= team2, y= team_total), label='um label') +
+    geom_bar(stat='identity', aes(fill=ifelse(team_total < 0, "below", "above")), width=.5)  +
+    scale_fill_manual(name="Mileage", 
+                    labels = c("Above Average", "Below Average"), 
+                    values = c("above"="#00ba38", "below"="#f8766d")) + 
+    labs(subtitle="Normalised mileage from 'mtcars'", 
+       title= "Diverging Bars") + 
+    coord_flip()
 
-gganimate(g, interval=0.2)
+theme_set(theme_bw())  # pre-set the bw theme.
+projetos %>% 
+    mutate(team = round((team - mean(team))/sd(team), 2)) %>%
+    ggplot(stat='identity', aes(x= lang, y= team))  +
+    scale_fill_manual(name="Mileage", 
+                    labels = c("Above Average", "Below Average"), 
+                    values = c("above"="#00ba38", "below"="#f8766d")) + 
+    labs(subtitle="Normalised mileage from 'mtcars'", 
+       title= "Diverging Bars") + 
+    coord_flip()
+
+
+m<-projetos %>% 
+    group_by(team) %>%
+    summarise(n=n())
+media<-m %>% 
+    summarise(n=mean(n))
+dp<-m %>% 
+    summarise(n=sd(n))
+
+theme_set(theme_bw())  # pre-set the bw theme.
+projetos %>% 
+    group_by(team) %>%
+    summarise(n=n()) %>% 
+    ggplot(aes(x= team, y= round((n-media)/dp))) + 
+    geom_col(fill = "darkcyan", color = "darkcyan")
+
+
+
 ```
 
 
